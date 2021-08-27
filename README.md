@@ -1,6 +1,10 @@
 # Simple Compiler
 
 ## Requirements
+- Python3
+- Graphviz
+
+Example installation of graphviz:
 ```
 sudo apt-get install graphviz
 pip install graphviz
