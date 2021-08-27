@@ -1,0 +1,51 @@
+// Final AST
+digraph {
+	A [label="Program Start"]
+	B [label="floatdcl
+b"]
+	A -> B
+	C [label="intdcl
+a"]
+	A -> C
+	D [label="intdcl
+c"]
+	A -> D
+	E [label="assign
+integer"]
+	F [label="id
+a"]
+	E -> F
+	G [label="inum
+5"]
+	E -> G
+	E [label="assign
+integer"]
+	A -> E
+	H [label="ASSIGN
+float"]
+	I [label="id
+b"]
+	H -> I
+	J [label="plus
+float"]
+	K [label="int2float
+float"]
+	L [label="id
+a"]
+	K -> L
+	K [label="int2float
+float"]
+	J -> K
+	M [label="fnum
+3.2"]
+	J -> M
+	J [label="plus
+float"]
+	H -> J
+	H [label="ASSIGN
+float"]
+	A -> H
+	N [label="print
+b"]
+	A -> N
+}
