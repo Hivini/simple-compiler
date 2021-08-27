@@ -1,3 +1,12 @@
+"""
+compiler.py: Compilador para nuestro programa simple de juguete.
+
+No estoy muy orgulloso de este programa porque pudo ser mejor y mas leible,
+pero no tuve tiempo por el trabajo y las otras materias, y se me hizo poquito
+tiempo una semana :(.
+"""
+__author__ = "Jorge Vinicio Quintero Santos. A01634502"
+
 import graphviz
 import argparse
 import os.path
