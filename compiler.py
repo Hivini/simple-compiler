@@ -388,11 +388,11 @@ class Compiler:
     def _nodeToCode(self, token: Token) -> str:
         """Converts an prints, integer and float declaration to a code representation."""
         if token.type == TokenType.INTEGER:
-            return f"intdcl({token.value})"
+            return f"DeclareInt {token.value}"
         elif token.type == TokenType.FLOAT:
-            return f"floatdcl({token.value})"
+            return f"DeclareFloat {token.value}"
         elif token.type == TokenType.PRINT:
-            return f"print({token.value})"
+            return f"Print {token.value}"
         return
 
     def _tempGenerator(self) -> str:
