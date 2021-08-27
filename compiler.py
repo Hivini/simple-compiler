@@ -7,6 +7,7 @@ RESERVED_SYMBOLS = ['p', 'i', 'f', '=', '+', '-', '.']
 
 
 class CompilerException(Exception):
+    """Declares that the compiler has encountered an error."""
     def __init__(self, message, lineStr, lineCounter) -> None:
         self.message = message
         self.lineStr = lineStr
@@ -14,6 +15,7 @@ class CompilerException(Exception):
 
 
 class TokenType(Enum):
+    """Types of valid tokens in the program."""
     FLOAT = 0
     INTEGER = 1
     PRINT = 2
@@ -27,7 +29,7 @@ class TokenType(Enum):
 
 
 class Token:
-    # TODO(hivini): We need to store also the position and line.
+    """Defines a single token in the program."""
     def __init__(self, value: str, type: TokenType, lineNumber: str):
         self.value = value
         self.type = type
@@ -38,6 +40,7 @@ class Token:
 
 
 class TreeNode:
+    """Represents a node in the AST tree."""
     # Conversion is not a great practice but it works for now for the nodes that need it.
     def __init__(self, token: Token, childs: list = [], conversion: TokenType = None):
         self.token = token
@@ -49,12 +52,62 @@ class TreeNode:
 
 
 class Compiler:
+    """The simple program compiler for our toy language."""
     _availableSymbols = [chr(97 + i) for i in range(26) if chr(97 + i)
                          not in RESERVED_SYMBOLS]  # [a-z] - RESERVED_SYMBOLS
-    _numbers = [str(i) for i in range(10)]
-    _arithmetic = [TokenType.MINUS, TokenType.PLUS]
+    _numbers = [str(i) for i in range(10)] # [0-9]
+    _arithmetic = [TokenType.MINUS, TokenType.PLUS] # Valid arithmetic operations.
+
+
+    def __init__(self) -> None:
+        self.declarationTokens: list[TokenType] = []
+        self.tokens: list[list[TokenType]] = []
+        self.symbolTable = {}
+        self.currentLineIndex = 1
+        self.currentLineStr = ''
+        self.astroot: TreeNode = None
+        self.gen = self._nodeGenerator()
+        self.tmpGen = self._tempGenerator()
+
+    def processFile(self, file_path: str, verbose=False):
+        """Process a file and outputs the three address code.
+        
+        The output of the code is stored in a file called 'output.ez' where the program was runned.
+        The AST created during parsing and modified during type checking will be exported in the
+        folder /graph where the program was runned.
+
+        If verbose is True, it will shows some important parts of the process on the stdout.
+        """
+        self._lexicalAnalysis(file_path)
+        self._parseTokens()
+        self._typeChecking()
+        lines = self._threeAddressCode()
+        self._saveTAC(lines)
+
+        self.dot = graphviz.Digraph(comment='Final AST')
+        self._buildAstGraph(self.astroot, next(self.gen))
+        self.dot.format = 'png'
+        self.dot.render('graph/output_graph')
+        if verbose:
+            print("============== LEXICAL ANALYSIS ==============")
+            print("==> Declarations")
+            for v in self.declarationTokens:
+                print(str(v))
+            print("==> Assignments")
+            for v in self.tokens:
+                for l in v:
+                    print(str(l))
+            print("==> Symbol Table")
+            print(self.symbolTable)
+            print("============== PARSER AND TYPE CHECKING ==============")
+            print("========== RESULT AST")
+            self._printastConsole(self.astroot, 1)
 
     def _validateNumber(self, num: str):
+        """Validates if a string is a number.
+        
+        Returns a position of the error (>= 0) if it's not a number, else -1.
+        """
         # We can do some other simpler stuff but just to simulate we are
         # in a low level language with no libraries we will do something rustic.
         dotfound = False
@@ -71,6 +124,10 @@ class Compiler:
         return -1
 
     def _generateDeclarationTokens(self, line: str):
+        """ Process the first lines of the program where all declarations are.
+        
+        It creates the appropiate tokens and assign them the TokenType FLOAT or INTEGER.
+        """
         # We assume that every token is separated by a white space and
         # declarations are first.
         lineTokens = line.split()
@@ -89,6 +146,7 @@ class Compiler:
                 raise CompilerException(f"Variable \"{symbol}\"was already declared", self.currentLineStr, self.currentLineIndex)
 
     def _generateTokens(self, line: str):
+        """Process all the tokens that are part of assignment and print below the declarations."""
         lineTokens = line.split()
         processedTokens = []
         for c in lineTokens:
@@ -132,7 +190,11 @@ class Compiler:
             self.tokens.append(processedTokens)
 
     def _lexicalAnalysis(self, file_path: str):
-        """ Lexical analyzer
+        """ Function in charge of lexical analysis of the language.
+
+        It receives the file path and process it. It first process declarations and then the rest.
+        If a declaration is encountered after assignments and prints start appearing, it will return
+        an error indicating that declarations must be first in the file.
         """
         self.programLines: list(str) = []
         with open(file_path, "r") as f:
@@ -154,15 +216,18 @@ class Compiler:
                 lineCounter += 1
 
     def _createCompilerError(self, message, token):
+        """Creates a new exception based on a token."""
         return CompilerException(message, self.programLines[token.lineNumber-1], token.lineNumber)
 
     def _checkTokenExists(self, t: Token):
+        """Verifies if a token exists on the symbol table."""
         if t.type == TokenType.ID:
             if not (t.value in self.symbolTable):
                 raise self._createCompilerError(
                     f"Parse Error. '{t.value}' is not defined.", t)
 
     def _parseStmts(self):
+        """Parses the statements of the program."""
         validNums = [TokenType.INUMBER, TokenType.FNUMBER, TokenType.ID]
         operations = [TokenType.MINUS, TokenType.PLUS]
         for lineTokens in self.tokens:
@@ -227,17 +292,22 @@ class Compiler:
                     "Parse Error. Invalid statement encountered.", currentT)
 
     def _parseTokens(self):
+        """Parser of the compiler.
+        
+        It creates an AST of the program.
+        """
         self.astroot = TreeNode(Token('Program', None, -1), [])
         # Process declarations first.
         for tdcl in self.declarationTokens:
-            # TODO
             self.astroot.childs.append(TreeNode(tdcl, []))
         self._parseStmts()
 
     def _getConversionToken(self, child):
+        """ Creates a new TreeNode that represents the conversion of an integer to float."""
         return TreeNode(Token("int2float", TokenType.INT2FLOAT, child.token.lineNumber), [child])
 
     def _typeNodeHelper(self, current: TreeNode) -> TreeNode:
+        """Recursive helper function for the _typeNode"""
         validFloats = [TokenType.FLOAT, TokenType.FNUMBER]
         rightNode = current.childs[1]
         if rightNode.token.type not in self._arithmetic:
@@ -268,6 +338,7 @@ class Compiler:
         return current
 
     def _typeNode(self, node: TreeNode) -> None:
+        """Modifies the AST and adds nodes where conversion is needed, also assigns types."""
         # Check if the right side is an operation.
         idType = self.symbolTable[node.childs[0].token.value]
         rightNodeToken = node.childs[1].token
@@ -288,11 +359,13 @@ class Compiler:
             node.conversion = idType
 
     def _typeChecking(self):
+        """Process all the tokens for type checking."""
         for child in self.astroot.childs:
             if child.token.type == TokenType.ASSIGN:
                 self._typeNode(child)
 
     def _nodeToCode(self, token: Token) -> str:
+        """Converts an prints, integer and float declaration to a code representation."""
         if token.type == TokenType.INTEGER:
             return f"intdcl({token.value})"
         elif token.type == TokenType.FLOAT:
@@ -302,12 +375,14 @@ class Compiler:
         return
 
     def _tempGenerator(self) -> str:
+        """Generates temporal variable names."""
         counter = 0
         while True:
             yield f"t{counter}"
             counter += 1
 
     def _threeAddressConversion(self, node, lines):
+        """Converts a int2float TreeNode to code representation."""
         if node.token.type == TokenType.INT2FLOAT:
             tmpVar = next(self.tmpGen)
             lines.append(f"{tmpVar} = int2float({node.childs[0].token.value})")
@@ -315,6 +390,13 @@ class Compiler:
         return node.token.value
 
     def _threeAddressCodeHelper(self, node: TreeNode, lines: list) -> str:
+        """Helper recursive function for _threeAddressCode.
+        
+        Return can be ignored, it is some weird recursion that uses it on the
+        same function, this is not great for readability, but I didn't realize
+        that in python you can create inner functions, so... rip, I am not
+        redoing it, busy with work zzz.
+        """
         if len(node.childs) == 0:
             if (node.token.type in [TokenType.INTEGER, TokenType.FLOAT, TokenType.PRINT]):
                 lines.append(self._nodeToCode(node.token))
@@ -348,12 +430,14 @@ class Compiler:
         return opVar
 
     def _threeAddressCode(self):
+        """Generates the lines for the three address code output."""
         lines = []
         for child in self.astroot.childs:
             self._threeAddressCodeHelper(child, lines)
         return lines
 
     def _printastConsole(self, root: TreeNode, depth: int):
+        """Prints the generated AST into the stdout."""
         if len(root.childs) == 0:
             print('--' * depth + "> " +
                   (root.token.value if root.token.type != TokenType.PRINT else "print " + root.token.value))
@@ -386,6 +470,10 @@ class Compiler:
                 cycle += 1
 
     def _treeNodeToString(self, node: TreeNode) -> str:
+        """Assigns a string value to every node in the AST for display purposes.
+        
+        Note: I think I should have mapped this at the start... but this made it look cool.
+        """
         token = node.token
         if token.type == None:
             return "Program Start"
@@ -419,6 +507,7 @@ class Compiler:
             return "unknown :("
 
     def _buildAstGraph(self, root: TreeNode, rootname: str) -> TreeNode:
+        """Builds the AST graph for graphviz."""
         if len(root.childs) == 0:
             return root
         else:
@@ -431,45 +520,10 @@ class Compiler:
             return root
 
     def _saveTAC(self, lines):
+        """Saves the Three Address Code in the 'output.ez' file."""
         with open("output.ez", "w") as f:
             for line in lines:
                 f.write(f"{line}\n")
-
-    def processFile(self, file_path: str, verbose=False):
-        self._lexicalAnalysis(file_path)
-        self._parseTokens()
-        self._typeChecking()
-        lines = self._threeAddressCode()
-        self._saveTAC(lines)
-
-        self.dot = graphviz.Digraph(comment='Final AST')
-        self._buildAstGraph(self.astroot, next(self.gen))
-        self.dot.format = 'png'
-        self.dot.render('graph/output_graph')
-        if verbose:
-            print("============== LEXICAL ANALYSIS ==============")
-            print("==> Declarations")
-            for v in self.declarationTokens:
-                print(str(v))
-            print("==> Assignments")
-            for v in self.tokens:
-                for l in v:
-                    print(str(l))
-            print("==> Symbol Table")
-            print(self.symbolTable)
-            print("============== PARSER AND TYPE CHECKING ==============")
-            print("========== RESULT AST")
-            self._printastConsole(self.astroot, 1)
-
-    def __init__(self) -> None:
-        self.declarationTokens: list[TokenType] = []
-        self.tokens: list[list[TokenType]] = []
-        self.symbolTable = {}
-        self.currentLineIndex = 1
-        self.currentLineStr = ''
-        self.astroot: TreeNode = None
-        self.gen = self._nodeGenerator()
-        self.tmpGen = self._tempGenerator()
 
 
 if __name__ == "__main__":
