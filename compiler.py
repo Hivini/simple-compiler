@@ -77,6 +77,7 @@ class Compiler:
         self.astroot: TreeNode = None
         self.gen = self._nodeGenerator()
         self.tmpGen = self._tempGenerator()
+        self.assigned: list[str] = []
 
     def processFile(self, file_path: str, verbose=False):
         """Process a file and outputs the three address code.
@@ -234,6 +235,11 @@ class Compiler:
             if not (t.value in self.symbolTable):
                 raise self._createCompilerError(
                     f"Parse Error. '{t.value}' is not defined.", t)
+    
+    def _checkTokenHasValue(self, t: Token):
+        if t.value not in self.assigned:
+            raise self._createCompilerError(f"Parse Error. '{t.value}' has not been assigned a value.", t)
+
 
     def _parseStmts(self):
         """Parses the statements of the program."""
@@ -251,7 +257,7 @@ class Compiler:
                         "Parse Error. Not a valid expression.", currentT)
                 if lineTokens[1].type != TokenType.ASSIGN:
                     raise self._createCompilerError(
-                        "Parse Error. ID assignment must be present.", lineTokens[1])
+                        "Parse Error. Equal must be present in assignment must be present.", lineTokens[1])
                 # Add new base assign node.
                 node = TreeNode(lineTokens[1], [TreeNode(currentT, [])])
                 currentNode = node
@@ -261,6 +267,8 @@ class Compiler:
                     raise self._createCompilerError(
                         f"Parse Error. Invalid token '{previousT.value}'.", previousT)
                 for index in range(3, len(lineTokens)):
+                    if previousT.type == TokenType.ID:
+                        self._checkTokenHasValue(previousT)
                     t = lineTokens[index]
                     if t.type in operations and previousT.type in validNums:
                         newChild = TreeNode(t, [TreeNode(previousT, [])])
@@ -279,21 +287,25 @@ class Compiler:
                 if (previousT.type in validNums):
                     if previousT.type == TokenType.ID:
                         self._checkTokenExists(previousT)
+                        self._checkTokenHasValue(previousT)
                     currentNode.childs.append(TreeNode(previousT, []))
                 else:
                     raise self._createCompilerError(
                         f"Parse Error. Invalid token '{t.value}'.", t)
+                self.assigned.append(currentT.value)
                 self.astroot.childs.append(node)
             elif (currentT.type == TokenType.PRINT):
                 if (len(lineTokens) < 2):
                     raise self._createCompilerError(
-                        "Parse Error. Invalid print statement. Print must be followed by one id.", currentT)
+                        "Parse Error. Invalid print statement. Print must be followed by one id or number.", currentT)
                 token = lineTokens[1]
-                if (len(lineTokens) > 2 or token.type != TokenType.ID):
+                if (len(lineTokens) > 2 or token.type not in [TokenType.ID, TokenType.INUMBER, TokenType.FNUMBER]):
                     raise self._createCompilerError(
-                        "Parse Error. Print statement can only be followed by one id.", lineTokens[2])
-                if token.value not in self.symbolTable:
-                    raise self._createCompilerError(f"Parse Error. ID '{token.value}' is not declared.", currentT)
+                        "Parse Error. Print statement can only be followed by one id or number.", lineTokens[0])
+                if token.type == TokenType.ID:
+                    if token.value not in self.symbolTable:
+                        raise self._createCompilerError(f"Parse Error. ID '{token.value}' is not declared.", currentT)
+                    self._checkTokenHasValue(token)
                 self.astroot.childs.append(
                     TreeNode(Token(token.value, TokenType.PRINT, token.lineNumber), []))
             else:

@@ -4,11 +4,11 @@ digraph {
 	B [label="floatdcl
 b"]
 	A -> B
-	C [label="intdcl
-a"]
+	C [label="floatdcl
+c"]
 	A -> C
 	D [label="intdcl
-c"]
+a"]
 	A -> D
 	E [label="assign
 integer"]
@@ -16,7 +16,7 @@ integer"]
 a"]
 	E -> F
 	G [label="inum
-5"]
+1"]
 	E -> G
 	E [label="assign
 integer"]
@@ -36,8 +36,16 @@ a"]
 	K [label="int2float
 float"]
 	J -> K
-	M [label="fnum
+	M [label="minus
+float"]
+	N [label="fnum
 3.2"]
+	M -> N
+	O [label="fnum
+1.0"]
+	M -> O
+	M [label="minus
+float"]
 	J -> M
 	J [label="plus
 float"]
@@ -45,7 +53,37 @@ float"]
 	H [label="ASSIGN
 float"]
 	A -> H
-	N [label="print
+	P [label="ASSIGN
+float"]
+	Q [label="id
+c"]
+	P -> Q
+	R [label="plus
+float"]
+	S [label="int2float
+float"]
+	T [label="id
+a"]
+	S -> T
+	S [label="int2float
+float"]
+	R -> S
+	U [label="id
 b"]
-	A -> N
+	R -> U
+	R [label="plus
+float"]
+	P -> R
+	P [label="ASSIGN
+float"]
+	A -> P
+	V [label="print
+c"]
+	A -> V
+	W [label="print
+a"]
+	A -> W
+	X [label="print
+b"]
+	A -> X
 }

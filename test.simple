@@ -1,5 +1,8 @@
-f b
-i a c
-a = 5
-b = a + 3.2
+f b c
+i a
+a = 1
+b = a + 3.2 - 1.0
+c = a + b
+p c
+p a
 p b
